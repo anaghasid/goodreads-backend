@@ -1,11 +1,14 @@
-import express from "express"
-import cors from "cors"
-import mongoose from "mongoose"
+const express = require('express');
+const cors = require('cors')
+const mongoose = require('mongoose')
+var MongoClient = require('mongodb').MongoClient;
+var url = "mongodb://localhost:27017/";
 
 const app = express()
 app.use(express.json())
 app.use(express.urlencoded())
 app.use(cors())
+
 
 mongoose.connect("mongodb://localhost:27017/goodreadsDB", {
     useNewUrlParser: true,
@@ -18,11 +21,28 @@ const userSchema = new mongoose.Schema({
     name: String,
     email: String,
     password: String,
-    listofbooks: [{ type: mongoose.Schema.Types.ObjectId, ref: 'books', default:{} }],
+    listofbooks: [{default:{}}],
     ratings : [{default:{}}]
 })
 
 const User = new mongoose.model("User", userSchema)
+
+app.get('/books',(req,res)=>{
+    MongoClient.connect(url, function(err, db) {
+        if (err) 
+           console.log(err);
+        
+        console.log("Helooo");
+        var dbo = db.db("goodreadsDB");
+        dbo.collection("books").find({}).toArray(function(err, bookresults) {
+           if (err) 
+               throw err;
+            res.send(bookresults)
+            console.log(bookresults)
+           db.close();
+       });
+    });
+})
 
 //Routes
 app.post("/login", (req, res)=> {
@@ -64,32 +84,23 @@ app.post("/register", (req, res)=> {
     
 }) 
 
-const bookSchema = new mongoose.Schema({
-    bname: String,
-    author: String,
-    description: String
-})
-
-const books = new mongoose.model("Book", bookSchema)
-
-//Routes
-app.post("/home/:uname", (req, res)=> {
-    // we will post the name of the book
-    const book = req.body
-    console.log(book)
-    User.findOne({name : uname},(err,found_user)=>{
-        if(found_user)
-        {
-            User.update({name: uname}, {$push: {listofbooks: book.uname}});
-            console.log("updated")
-        }
-        if(err)
-        {
-            throw err
-        }
+app.post("/books",(req,res)=>{
+    const {book, stars} = req.body
+    MongoClient.connect("mongodb://localhost:27017/", function(err,db){
+        if(err) throw err;
+        var dbo = db.db("goodreadsDB");
+        var myquery = {Book:book};
+        console.log(book)
+        var newvalue = {$set:{Stars:stars}};
+        dbo.collection("books").findOne(myquery,(err,res)=>{
+            console.log(res)
+            dbo.collection("books").updateOne(res,newvalue,function(err,res){
+            if(err) throw err;
+            });
+            // db.close();
+        })
     })
-}) 
-
+})
 
 app.listen(9002,() => {
     console.log("backend at port 9002")
